@@ -33,9 +33,9 @@ LoxOS is a minimal **16-bit real mode operating system** written entirely in **x
 ---
 
 ## 🧱 Build & Run
-**make clean**
-**make**
-**make run**
+- **make clean**
+- **make**
+- **make run**
 
 ## 📁 File Structure
 File	Description
