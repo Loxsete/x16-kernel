@@ -37,15 +37,15 @@ make clean
 make
 make run
 
-📁 File Structure
+## 📁 File Structure
 File	Description
-bootloader.asm	Loads the kernel from disk into memory and jumps to it
-kernel.asm	Main OS with command-line interface and logic
-loxos.img	Bootable image (created manually)
-📜 License
+- **boot.asm**
+- **kernel.asm**
+- **Makefile**
+
+## 📜 License
 This project is public domain / MIT – use it however you like. Attribution is appreciated but not required.
 
-✍️ Author
-Made by Loxsete
+## ✍️ Author
+**Made by Loxsete**
 
-Follow updates and development at: github.com/Loxsete
