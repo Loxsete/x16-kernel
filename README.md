@@ -19,7 +19,9 @@ LoxOS is a minimal **16-bit real mode operating system** written entirely in **x
   - `info` – Shows an info table about the OS
 - **Custom BIOS bootloader** loads the kernel from disk
 - **Text output** using BIOS interrupt `0x10`
-- **Graphic mode 0x13** (320x200, 256 colors) 
+- **Graphic mode 0x13** (320x200, 256 colors)
+- ![2025-04-17T20_27_59,732378334+03_00](https://github.com/user-attachments/assets/bf0e7485-de39-4941-a743-a179f4a95d42)
+
 ![2025-04-17T20_20_41,873831067+03_00](https://github.com/user-attachments/assets/960b9b51-1032-4e87-8255-3c72e3e2a720)
 
 ---
