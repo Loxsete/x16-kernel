@@ -1,4 +1,4 @@
-Оттабулируй все красиво, это реадми
+
 # LoxOS 0.2
 
 LoxOS is a minimal **16-bit real mode operating system** written entirely in **x86 Assembly**. It features a simple command-line interface with built-in commands such as `help`, `clear`, `cpuid`, `info`, and `mem`. This project is designed for **educational purposes**, **hobby OS development**, and demonstrating basic **BIOS-level interactions**.
