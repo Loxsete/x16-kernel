@@ -6,7 +6,7 @@ kernel_start:
     mov al, 0x12
     int 0x10
 
-    mov si, info_msg1
+    mov si, ASCII_art
     call print_string
     call print_newline
 
@@ -111,8 +111,19 @@ process_command:
     call strcmp_first_word
     jc do_dump
 
+    mov si, buffer
+    mov di, cmd_reboot
+    call strcmp_first_word
+    jc do_reboot
+
+    mov si, buffer
+    mov di, cmd_time
+    call strcmp_first_word
+    jc do_time
+
     mov si, error_msg
-    call print_string
+    mov cl, 0x0C
+    call print_string_color
     call print_newline
     jmp reset_buffer
 
@@ -123,6 +134,9 @@ do_clear:
     jmp reset_buffer
 
 do_dump:
+    mov ax, 0
+    mov es, ax
+
     mov si, buffer
     call skip_word
     cmp byte [si], 0
@@ -130,10 +144,29 @@ do_dump:
 
     call parse_hex
     mov bx, ax
-    jmp .start_dump
+    call skip_word
+    cmp byte [si], 0
+    je .use_default_count
+
+    call parse_hex
+    mov dx, ax
+    cmp dx, 0
+    je .use_default_count
+    jmp .validate_count
 
 .use_default:
     mov bx, 0
+.use_default_count:
+    mov dx, 256
+
+.validate_count:
+    cmp dx, 4096
+    jbe .count_ok
+    mov dx, 4096
+.count_ok:
+
+    mov [last_dump_addr], bx
+    mov [last_dump_count], dx
 
 .start_dump:
     mov si, dump_header
@@ -146,10 +179,19 @@ do_dump:
     call print_hex
     call print_newline
 
+    mov ax, dx
     mov cx, 16
+    xor dx, dx
+    div cx
+    cmp dx, 0
+    je .no_extra_line
+    inc ax
+.no_extra_line:
+    mov cx, ax
 
 .dump_line:
     push cx
+    push bx
 
     mov ax, bx
     call print_address
@@ -158,7 +200,11 @@ do_dump:
     mov cx, 16
 
 .dump_bytes:
+    cmp word [last_dump_count], 0
+    je .fill_spaces
+
     mov al, [es:bx]
+    dec word [last_dump_count]
 
     cmp al, 32
     jl .non_printable
@@ -177,11 +223,31 @@ do_dump:
     inc di
 
     call print_hex
+
+    mov ax, bx
+    and ax, 0x03
+    cmp ax, 0x03
+    je .double_space
+    call print_space
+    jmp .next_byte
+.double_space:
+    call print_space
     call print_space
 
+.next_byte:
     inc bx
     loop .dump_bytes
+    jmp .print_ascii
 
+.fill_spaces:
+    mov byte [di], ' '
+    inc di
+    mov al, ' '
+    call print_hex
+    call print_space
+    loop .fill_spaces
+
+.print_ascii:
     call print_space
     call print_space
     mov byte [di], 0
@@ -190,12 +256,19 @@ do_dump:
 
     call print_newline
 
+    pop bx
+    add bx, 16
     pop cx
     dec cx
     jnz .dump_line
 
     call print_newline
+
+    mov [last_dump_addr], bx
     jmp reset_buffer
+
+last_dump_addr  dw 0
+last_dump_count dw 0
 
 skip_word:
     cmp byte [si], 0
@@ -411,10 +484,159 @@ print_decimal:
     ret
 
 do_help:
-    mov si, help_msg
-    call print_string
+    mov si, buffer
+    call skip_word
+    cmp byte [si], 0
+    je .show_general_help
+
+    mov di, cmd_clear
+    call strcmp_first_word
+    jc .help_clear
+
+    mov di, cmd_cpuid
+    call strcmp_first_word
+    jc .help_cpuid
+
+    mov di, cmd_help
+    call strcmp_first_word
+    jc .help_help
+
+    mov di, cmd_info
+    call strcmp_first_word
+    jc .help_info
+
+    mov di, cmd_mem
+    call strcmp_first_word
+    jc .help_mem
+
+    mov di, cmd_dump
+    call strcmp_first_word
+    jc .help_dump
+
+    mov di, cmd_reboot
+    call strcmp_first_word
+    jc .help_reboot
+
+    mov di, cmd_time
+    call strcmp_first_word
+    jc .help_time
+
+    mov si, help_error_msg
+    mov cl, 0x0C
+    call print_string_color
     call print_newline
     jmp reset_buffer
+
+.show_general_help:
+    mov si, help_header
+    mov cl, 0x0E
+    call print_string_color
+    call print_newline
+
+    mov si, help_clear
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    mov si, help_cpuid
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    mov si, help_help
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    mov si, help_info
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    mov si, help_mem
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    mov si, help_dump
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    mov si, help_reboot
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    mov si, help_time
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
+    call print_newline
+    jmp reset_buffer
+
+.help_clear:
+    mov si, help_clear_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_cpuid:
+    mov si, help_cpuid_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_help:
+    mov si, help_help_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_info:
+    mov si, help_info_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_mem:
+    mov si, help_mem_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_dump:
+    mov si, help_dump_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_reboot:
+    mov si, help_reboot_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_time:
+    mov si, help_time_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+do_reboot:
+    mov si, reboot_msg
+    call print_string
+    call print_newline
+    jmp 0xFFFF:0x0000
 
 do_info:
     mov si, info_border
@@ -461,6 +683,14 @@ do_info:
     call print_string
     call print_newline
 
+    mov si, info_row11
+    call print_string
+    call print_newline
+
+    mov si, info_row12
+    call print_string
+    call print_newline
+
     mov si, info_border
     call print_string
     call print_newline
@@ -471,24 +701,97 @@ do_mem:
     call print_string
     call print_newline
 
-    mov si, 0x0000
-    mov es, si
-    mov si, 0x0000
-    mov cx, 256
-    mov bx, 0
+    mov ax, 0x0000
+    mov es, ax
+    mov bx, 0x0000
+    mov dx, 256
 
-.next_byte:
+    mov cx, 16
+
+.dump_line:
+    push cx
+    push bx
+
     mov ax, bx
     call print_address
 
-    mov al, [es:si]
+    mov di, temp_buffer
+    mov cx, 16
+
+.dump_bytes:
+    mov al, [es:bx]
+
+    cmp al, 32
+    jl .non_printable
+    cmp al, 126
+    jg .non_printable
+    jmp .printable
+
+.non_printable:
+    mov byte [di], '.'
+    jmp .store_ascii
+
+.printable:
+    mov [di], al
+
+.store_ascii:
+    inc di
+
     call print_hex
-    mov al, ' '
+
+    mov ax, bx
+    and ax, 0x03
+    cmp ax, 0x03
+    je .double_space
+    call print_space
+    jmp .next_byte
+.double_space:
+    call print_space
+    call print_space
+
+.next_byte:
+    inc bx
+    loop .dump_bytes
+
+    call print_space
+    call print_space
+    mov byte [di], 0
+    mov si, temp_buffer
+    call print_string
+
+    call print_newline
+
+    pop bx
+    add bx, 16
+    pop cx
+    dec cx
+    jnz .dump_line
+
+    call print_newline
+    jmp reset_buffer
+
+do_time:
+    mov si, time_msg
+    call print_string
+
+    mov al, 0x04
+    out 0x70, al
+    in al, 0x71
+    call print_hex
+    mov al, ':'
     call print_char
 
-    inc si
-    inc bx
-    loop .next_byte
+    mov al, 0x02
+    out 0x70, al
+    in al, 0x71
+    call print_hex
+    mov al, ':'
+    call print_char
+
+    mov al, 0x00
+    out 0x70, al
+    in al, 0x71
+    call print_hex
 
     call print_newline
     jmp reset_buffer
@@ -500,6 +803,23 @@ print_char:
     mov bh, 0
     mov bl, 0x07
     int 0x10
+    pop bx
+    pop ax
+    ret
+
+print_string_color:
+    push ax
+    push bx
+    mov bl, cl
+print_loop_color:
+    lodsb
+    cmp al, 0
+    je print_done_color
+    mov ah, 0x0e
+    mov bh, 0
+    int 0x10
+    jmp print_loop_color
+print_done_color:
     pop bx
     pop ax
     ret
@@ -638,9 +958,29 @@ strcmp_first_equal:
     pop si
     ret
 
-prompt     db '> ', 0
+prompt     db 'Lox > ', 0
 error_msg  db 'Unknown command', 0
-help_msg   db 'Commands: clear, cpuid, help, info, mem, dump', 0
+
+help_header        db 'LoxOS Help: Available Commands', 0
+help_error_msg     db 'Error: Unknown command for help', 0
+
+help_clear         db 'clear   - Clear the screen', 0
+help_cpuid         db 'cpuid   - Display CPU information', 0
+help_help          db 'help    - Show this help (use "help <cmd>" for details)', 0
+help_info          db 'info    - Show system information', 0
+help_mem           db 'mem     - Dump first 256 bytes of RAM', 0
+help_dump          db 'dump    - Dump memory at address (e.g., dump 0x100 64)', 0
+help_reboot        db 'reboot  - Reboot the system', 0
+help_time          db 'time    - Show system time from CMOS', 0
+
+help_clear_detail  db 'clear: Clears the screen and resets the display to VGA mode 0x12 (640x480, 16 colors).', 0
+help_cpuid_detail  db 'cpuid: Displays CPU vendor, name, and logical processor count using CPUID instruction.', 0
+help_help_detail   db 'help: Shows a list of commands. Use "help <command>" for detailed information.', 0
+help_info_detail   db 'info: Displays system information, including version, mode, and available commands.', 0
+help_mem_detail    db 'mem: Dumps the first 256 bytes of RAM starting from address 0x0000.', 0
+help_dump_detail   db 'dump [addr] [count]: Dumps memory starting at addr (hex) for count bytes (default 256).', 0
+help_reboot_detail db 'reboot: Restarts the system by jumping to the BIOS reset vector.', 0
+help_time_detail   db 'time: Displays the current system time (HH:MM:SS) from the CMOS RTC.', 0
 dump_address_msg   db 'Memory dump from address 0x', 0
 cpuid_msg  db 'CPU Info:', 0
 info_msg1  db 'Welcome to LoxOS 0.2! Thanks for testing', 0
@@ -651,6 +991,8 @@ name_msg    db 'CPU Name: ', 0
 threads_msg db 'Logical Processors: ', 0
 unknown_cores_msg db 'CPU cores: Cannot determine', 0
 dump_header db 'Dumping first 256 bytes of memory:', 0
+reboot_msg  db 'Rebooting system...', 0
+time_msg  db 'System time (HH:MM:SS): ', 0
 info_border db '+----------------------------------------+', 0
 info_row1   db '| LoxOS 0.3                             |', 0
 info_row2   db '| Created by Loxsete                    |', 0
@@ -662,10 +1004,24 @@ info_row7   db '| mem   - show RAM                      |', 0
 info_row8   db '| clear - clear screen                  |', 0
 info_row9   db '| cpuid - show CPU Info                 |', 0
 info_row10 db '| dump or dump XXX - dump memory        |', 0
+info_row11 db '| reboot - reboot PC                    |', 0
+info_row12 db '| time - time on CMOS                   |', 0
+
+ASCII_art:
+    db " ####      #####   ##  ##", 0Dh, 0Ah
+    db "  ##      ##   ##  ##  ##", 0Dh, 0Ah
+    db "  ##      ##   ##   ####              ####     #####", 0Dh, 0Ah
+    db "  ##      ##   ##    ##              ##  ##   ##", 0Dh, 0Ah
+    db "  ##   #  ##   ##   ####             ##  ##    #####", 0Dh, 0Ah
+    db "  ##  ##  ##   ##  ##  ##            ##  ##        ##", 0Dh, 0Ah
+    db " #######   #####   ##  ##             ####    ######", 0Dh, 0Ah
+    db 0
 cmd_clear   db 'clear', 0
 cmd_cpuid   db 'cpuid', 0
 cmd_help    db 'help', 0
 cmd_info    db 'info', 0
 cmd_mem     db 'mem', 0
 cmd_dump    db 'dump', 0
+cmd_reboot  db 'reboot', 0
+cmd_time  db 'time', 0
 buffer      times 256 db 0
