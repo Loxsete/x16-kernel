@@ -1,62 +1,87 @@
-; ==== BOOTLOADER ====
 [bits 16]
-[org 0x7c00]
+[org 0x7C00]
 
-start:
-    cli
-    xor ax, ax
-    mov ds, ax
-    mov es, ax
-    mov ss, ax
-    mov sp, 0x7c00
-    sti
+KERNEL_OFFSET equ 0x500
+KERNEL_SECTORS equ 8
 
+xor ax, ax
+mov ds, ax
+mov es, ax
+mov ss, ax
+mov sp, 0x7C00
 
-    mov si, boot_info
-    call print_string
+mov [BOOT_DRIVE], dl
 
+mov si, BOOT_MSG
+call print_string
 
-    mov ah, 0x02
-    mov al, 4
-    mov ch, 0
-    mov cl, 2
-    mov dh, 0
-    mov dl, 0
-    mov bx, 0x7E00
-    int 0x13
+mov si, RESET_MSG
+call print_string
 
-    jc disk_error
+xor ah, ah
+mov dl, [BOOT_DRIVE]
+int 0x13
+jc disk_error
 
-    jmp 0x7E00
+mov si, LOAD_START_MSG
+call print_string
+
+mov ah, 0x02
+mov al, KERNEL_SECTORS
+mov ch, 0
+mov cl, 2
+mov dh, 0
+mov dl, [BOOT_DRIVE]
+mov bx, KERNEL_OFFSET
+int 0x13
+jc disk_error
+
+mov si, VERIFY_MSG
+call print_string
+
+cmp al, KERNEL_SECTORS
+jne sector_error
+
+mov si, SUCCESS_MSG
+call print_string
+
+mov si, JUMP_MSG
+call print_string
+
+jmp KERNEL_OFFSET
 
 disk_error:
-    mov si, error_msg
+    mov si, DISK_ERROR_MSG
+    call print_string
+    jmp $
+
+sector_error:
+    mov si, SECTOR_ERROR_MSG
     call print_string
     jmp $
 
 print_string:
+    pusha
+.next_char:
     lodsb
-    cmp al, 0
-    je print_done
-    mov ah, 0x0e
-    mov bx, 0x07
+    test al, al
+    jz .done
+    mov ah, 0x0E
     int 0x10
-    jmp print_string
-print_done:
+    jmp .next_char
+.done:
+    popa
     ret
 
-boot_info: db '+-------------------------+', 0x0a, 0x0d
-           db '|      LoxOS Bootloader   |', 0x0a, 0x0d
-           db '|-------------------------|', 0x0a, 0x0d
-           db '| Developer: Loxsete      |', 0x0a, 0x0d
-           db '| Type: 16-bit Bootloader |', 0x0a, 0x0d
-           db '| Features:               |', 0x0a, 0x0d
-           db '|  - Disk Loading         |', 0x0a, 0x0d
-           db '|  - Error Handling       |', 0x0a, 0x0d
-           db '|  - Protected Mode Jump  |', 0x0a, 0x0d
-           db '+-------------------------+', 0x0a, 0x0d, 0
-
-error_msg: db 'Disk read error', 0
+BOOT_MSG         db 'LoxOS Bootloader starting...', 13, 10, 0
+RESET_MSG        db 'Resetting disk system...', 13, 10, 0
+LOAD_START_MSG   db 'Reading kernel sectors...', 13, 10, 0
+VERIFY_MSG       db 'Verifying sector count...', 13, 10, 0
+SUCCESS_MSG      db 'Kernel loaded successfully.', 13, 10, 0
+DISK_ERROR_MSG   db 'Disk read error occurred!', 13, 10, 0
+SECTOR_ERROR_MSG db 'Mismatch in number of sectors read!', 13, 10, 0
+JUMP_MSG         db 'Jumping to kernel...', 13, 10, 0
+BOOT_DRIVE       db 0
 
 times 510-($-$$) db 0
-dw 0xaa55
+dw 0xAA55
