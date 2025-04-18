@@ -1,5 +1,5 @@
 [bits 16]
-[org 0x7E00]
+[org 500h]
 
 kernel_start:
     mov ah, 0x00
