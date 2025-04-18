@@ -22,6 +22,8 @@ LoxOS is a minimal **16-bit real mode operating system** written entirely in **x
 - **Graphic mode 0x13** (320x200, 256 colors)
 - ![2025-04-17T20_27_59,732378334+03_00](https://github.com/user-attachments/assets/bf0e7485-de39-4941-a743-a179f4a95d42)
 
+![2025-04-18T11_02_23,351678978+03_00](https://github.com/user-attachments/assets/0b70ef03-4bca-4ae4-a1b6-2672f074797a)
+
 ![2025-04-17T20_20_41,873831067+03_00](https://github.com/user-attachments/assets/960b9b51-1032-4e87-8255-3c72e3e2a720)
 
 ---
