@@ -121,6 +121,12 @@ process_command:
     call strcmp_first_word
     jc do_time
 
+    mov si, buffer
+    mov di, cmd_disks
+    call strcmp_first_word
+    jc do_disks
+
+
     mov si, error_msg
     mov cl, 0x0C
     call print_string_color
@@ -521,6 +527,10 @@ do_help:
     call strcmp_first_word
     jc .help_time
 
+    mov di, cmd_disks
+    call strcmp_first_word
+    jc .help_disks
+
     mov si, help_error_msg
     mov cl, 0x0C
     call print_string_color
@@ -573,11 +583,23 @@ do_help:
     call print_string_color
     call print_newline
 
+    mov si, help_disks
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+
     call print_newline
     jmp reset_buffer
 
 .help_clear:
     mov si, help_clear_detail
+    mov cl, 0x07
+    call print_string_color
+    call print_newline
+    jmp reset_buffer
+
+.help_disks:
+    mov si, help_disks_detail
     mov cl, 0x07
     call print_string_color
     call print_newline
@@ -632,6 +654,59 @@ do_help:
     call print_newline
     jmp reset_buffer
 
+do_disks:
+    mov si, disks_header
+    call print_string
+    call print_newline
+
+    mov dl, 0x80
+.next_disk:
+    mov ah, 0x08
+    int 0x13
+    jc .done
+
+    mov si, disk_found_msg
+    call print_string
+    mov al, dl
+    call print_hex8
+    call print_space
+
+    mov si, heads_msg
+    call print_string
+    mov al, dh
+    inc al
+    call print_decimal
+    call print_space
+
+    mov si, sectors_msg
+    call print_string
+    mov al, cl
+    and al, 0x3F
+    call print_decimal
+    call print_space
+
+    mov si, cylinders_msg
+    call print_string
+    mov al, cl
+    and al, 0xC0
+    shr al, 6
+    mov ah, 0
+    mov bl, ch
+    mov bh, 0
+    shl ax, 2
+    or ax, bx
+    inc ax
+    call print_decimal
+    call print_newline
+
+    inc dl
+    cmp dl, 0x88
+    jb .next_disk
+
+.done:
+    call print_newline
+    jmp reset_buffer
+
 do_reboot:
     mov si, reboot_msg
     call print_string
@@ -663,33 +738,7 @@ do_info:
     call print_string
     call print_newline
 
-    mov si, info_row6
-    call print_string
-    call print_newline
 
-    mov si, info_row7
-    call print_string
-    call print_newline
-
-    mov si, info_row8
-    call print_string
-    call print_newline
-
-    mov si, info_row9
-    call print_string
-    call print_newline
-
-    mov si, info_row10
-    call print_string
-    call print_newline
-
-    mov si, info_row11
-    call print_string
-    call print_newline
-
-    mov si, info_row12
-    call print_string
-    call print_newline
 
     mov si, info_border
     call print_string
@@ -883,6 +932,40 @@ print_hex:
     call print_nibble
     ret
 
+print_hex8:
+    push ax
+    push bx
+
+    mov ah, al
+    shr ah, 4
+    and al, 0x0F
+    and ah, 0x0F
+
+    mov bl, ah
+    call print_hex_digit
+
+    mov bl, al
+    call print_hex_digit
+
+    pop bx
+    pop ax
+    ret
+
+print_hex_digit:
+    ; Вход: AL — число от 0 до 15
+    cmp al, 10
+    jl .digit
+    add al, 'A' - 10
+    jmp .out
+.digit:
+    add al, '0'
+.out:
+    mov ah, 0x0e
+    int 0x10
+    ret
+
+
+
 print_nibble:
     cmp al, 10
     jl .digit
@@ -981,6 +1064,8 @@ help_mem_detail    db 'mem: Dumps the first 256 bytes of RAM starting from addre
 help_dump_detail   db 'dump [addr] [count]: Dumps memory starting at addr (hex) for count bytes (default 256).', 0
 help_reboot_detail db 'reboot: Restarts the system by jumping to the BIOS reset vector.', 0
 help_time_detail   db 'time: Displays the current system time (HH:MM:SS) from the CMOS RTC.', 0
+help_disks         db 'disks   - List detected BIOS disks and their parameters', 0
+help_disks_detail  db 'disks: Lists detected BIOS disks with their drive number, heads, sectors per track, and cylinders.', 0
 dump_address_msg   db 'Memory dump from address 0x', 0
 cpuid_msg  db 'CPU Info:', 0
 info_msg1  db 'Welcome to LoxOS 0.2! Thanks for testing', 0
@@ -992,20 +1077,19 @@ threads_msg db 'Logical Processors: ', 0
 unknown_cores_msg db 'CPU cores: Cannot determine', 0
 dump_header db 'Dumping first 256 bytes of memory:', 0
 reboot_msg  db 'Rebooting system...', 0
+disks_header db 'Detected BIOS Disks: ', 0
+heads_msg     db 'Heads: ', 0
+sectors_msg   db 'Sectors: ', 0
+cylinders_msg db 'Cylinders: ', 0
+disk_found_msg db 'Disk found: 0x', 0
 time_msg  db 'System time (HH:MM:SS): ', 0
 info_border db '+----------------------------------------+', 0
 info_row1   db '| LoxOS 0.3                             |', 0
 info_row2   db '| Created by Loxsete                    |', 0
 info_row3   db '| Mode: 0x12 graphics                   |', 0
 info_row4   db '| Kernel: Mini, 16-bit                  |', 0
-info_row5   db '| Commands:                             |', 0
-info_row6   db '| help  - show help                     |', 0
-info_row7   db '| mem   - show RAM                      |', 0
-info_row8   db '| clear - clear screen                  |', 0
-info_row9   db '| cpuid - show CPU Info                 |', 0
-info_row10 db '| dump or dump XXX - dump memory        |', 0
-info_row11 db '| reboot - reboot PC                    |', 0
-info_row12 db '| time - time on CMOS                   |', 0
+info_row5   db '| To se commands - help                 |', 0
+
 
 ASCII_art:
     db " ####      #####   ##  ##", 0Dh, 0Ah
@@ -1023,5 +1107,6 @@ cmd_info    db 'info', 0
 cmd_mem     db 'mem', 0
 cmd_dump    db 'dump', 0
 cmd_reboot  db 'reboot', 0
+cmd_disks db 'disks', 0
 cmd_time  db 'time', 0
 buffer      times 256 db 0
