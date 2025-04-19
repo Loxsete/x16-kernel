@@ -40,9 +40,9 @@ LoxOS is a minimal **16-bit real mode operating system** written entirely in **x
 ---
 
 ## 🧱 Build & Run
-- **make clean**
-- **make**
-- **make run-usb** or **make run-hd**
+- **chmod +x build.sh**
+- **./build.sh all**
+- **./build.sh run-usb**
 
 ## 📁 File Structure
 File	Description
